@@ -62,6 +62,10 @@ public:
         inline node(const answer_type &_val_,const input_type &e,int _key,int _size_=1):cnt(_size_),size(_size_),reverse_tag(false){key=_key,val=_val_,tag=e;}
 
         inline bool is_root(){return get_if<weak_ptr<node>>(&fa)==nullptr;}
+        inline shared_ptr get_fa(){
+            if(is_root()) return nullptr;
+            return get<weak_ptr<node>>(fa).lock();
+        }
         inline tp& fndtree(){
             if(!is_root()) return get<weak_ptr<node>>(fa).lock()->fndtree();
             else return *get<weak_ptr<tp>>(fa).lock();

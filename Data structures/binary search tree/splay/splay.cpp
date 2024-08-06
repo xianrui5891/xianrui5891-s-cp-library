@@ -273,7 +273,7 @@ public:
     inline void erase(uint k){
         auto&& ind=get_ptr_by_rk(k);
         ind->cnt--,ind->size--;
-        if(ind->cnt&&!is_root(ind)) 
+        if(ind->cnt&&!is_root(ind)) pushup()
     }//只删除排名为k的（1个val）
     inline void erase(const answer_type& val){
         
