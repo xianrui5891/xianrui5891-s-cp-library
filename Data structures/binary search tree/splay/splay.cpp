@@ -48,25 +48,30 @@ protected:
     answer_type answer_type_e;
     input_type input_type_e;
 public:
-    struct node{
+    struct node:enable_shared_from_this<node>{
         uint cnt,size;
         answer_type val;
         input_type tag;
         bool reverse_tag;
         shared_ptr<node> ls,rs;
         variant<weak_ptr<node>,weak_ptr<tp>> fa;
+        using enable_shared_from_this<node>::shared_from_this;
 
         inline node():cnt(),size(),val(),tag(),reverse_tag(false),ls(nullptr),rs(nullptr),fa(){};
         inline node(const answer_type &_val_,const input_type &e,int _size_=1):cnt(_size_),size(_size_),reverse_tag(false){val=_val_,tag=e;}
 
         inline bool is_root()const{return get_if<weak_ptr<node>>(&fa)==nullptr;}
-        inline shared_ptr get_fa(){
+        inline shared_ptr<node> get_fa(){
             if(is_root()) return nullptr;
             return get<weak_ptr<node>>(fa).lock();
         }
         inline tp& fndtree(){
             if(!is_root()) return get<weak_ptr<node>>(fa).lock()->fndtree();
             else return *get<weak_ptr<tp>>(fa).lock();
+        }
+        inline shared_ptr<node> fndroot(){
+            if(!is_root()) return get<weak_ptr<node>>(fa).lock()->fndtree();
+            else return shared_from_this();
         }
     };
     shared_ptr<node> rt;
@@ -76,6 +81,7 @@ public:
     constexpr inline uint get_size(const shared_ptr<node>& ind){return ind==nullptr?0:ind->size;}
     constexpr inline uint get_cnt(const shared_ptr<node>& ind){return ind==nullptr?0:ind->cnt;}
     constexpr inline void set_tree(){if(rt!=nullptr) rt->fa=weak_from_this();}
+    constexpr inline void set_tree(const shared_ptr<node>& ind){if(ind!=nullptr) ind->fa=weak_from_this();}
     constexpr inline bool is_root(const shared_ptr<node>& ind){return ind==nullptr||ind->is_root();}
 protected:
     function<bool(const answer_type &,const answer_type &)> is_equal=[&](const answer_type &x,const answer_type &y)->bool {return !(comp(x,y)^comp(y,x));};
@@ -138,7 +144,7 @@ public:
     }
     inline void real_splay(const shared_ptr<node> &ind,const shared_ptr<node> goal){
         if(ind==nullptr) return;
-        for(;!is_root(ind)||get<0>(fa->fa).lock()!=goal;rotate(ind)){
+        for(;!is_root(ind)||get<0>(ind->fa).lock()!=goal;rotate(ind)){
             if(auto&& fa=get<0>(ind->fa).lock();!is_root(fa)) 
                 rotate(((get<0>(fa->fa).lock()->ls==fa)^(fa->ls==ind))?ind:fa);
         }
@@ -189,6 +195,8 @@ public:
     constexpr inline splay& operator=(tp& _tr)=delete;
     constexpr inline splay& operator=(tp&& _tr)=default;
     constexpr inline tp& operator=(shared_ptr<node>&& _rt){rt=exchange(_rt,nullptr),set_tree();return *this;}
+protected:
+
 public:
     inline uint get_rk(shared_ptr<node> ind){
         if(ind==nullptr) return 0;
@@ -197,8 +205,8 @@ public:
     }
     
     template<typename binary_pred_for_answer_t> 
-    inline uint get_rk_by_pred(const answer_type& val,const binary_pred_for_answer_t& pred){
-        auto ind=rt,lst=nullptr;
+    inline uint get_rk_by_pred(const answer_type& val,shared_ptr<node> ind,const binary_pred_for_answer_t& pred){
+        shared_ptr<node> lst;
         uint res=0;
         while(ind!=nullptr){
             if(pred(ind->val,val)){
@@ -211,10 +219,13 @@ public:
         real_splay(lst);
         return res+1;
     }//排名从1开始
-    inline uint get_rk(const answer_type& val){return get_rk_by_pred(val,strong_comp);}
+    template<typename binary_pred_for_answer_t> 
+    inline uint get_rk_by_pred(const answer_type& val,const binary_pred_for_answer_t& pred){return get_rk_by_pred(val,rt,pred);}//排名从1开始
+    inline uint get_rk(const answer_type& val,const shared_ptr<node>& ind){return get_rk_by_pred(val,ind,strong_comp);}
+    inline uint get_rk(const answer_type& val){return get_rk_by_pred(val,rt,strong_comp);}
 
     inline shared_ptr<node> get_ptr_by_rk(uint k,shared_ptr<node> ind){
-        assert(k>=1&&k<=get_size(ind));
+        if(k<1||k>get_size(ind)) return nullptr;
         while(ind!=nullptr){
             uint lsiz=get_size(ind->ls);
             if(lsiz<k&&k<=lsiz+ind->cnt) return real_splay(ind),ind;
@@ -234,16 +245,17 @@ public:
     inline shared_ptr<node> next(const answer_type& val){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp));}
     
     inline void insert(uint k,const shared_ptr<node>& _ptr_){
-        assert(k>=1&&k<=get_size(ind));
+        auto ind=rt;
+        shared_ptr<node> lst;
+        assert(k>=1&&k<=get_size(rt));
         k--;
-        auto ind=rt,lst=nullptr;
         bool flg;
         while(ind!=nullptr){
             uint lsiz=get_size(ind->ls);
             lst=ind;
             if(lsiz<k&&k<=lsiz+ind->cnt){
                 real_splay(ind);
-                flag=true;
+
                 break;
             }
             else if(k<=lsiz) ind=ind->ls;
@@ -254,10 +266,11 @@ public:
         real_splay(_ptr_);
     }//插到k+1位置上，标号1开始
     inline void insert(const shared_ptr<node>& _ptr_){//ind->val可能不存在
-        auto ind=rt,lst=nullptr;
+        auto ind=rt;
+        shared_ptr<node> lst;
         while(ind!=nullptr){
             lst=ind;
-            if(pred(ind->val,val)) ind=ind->rs;
+            if(pred(ind->val,_ptr_->val)) ind=ind->rs;
             else ind=ind->ls;
         }
         if(strong_comp(lst->val)) lst->rs=_ptr_;
@@ -268,12 +281,14 @@ public:
     inline void insert(const input_type& val){insert(apply_newnode(assign(answer_type_e,val)));}
 
     inline void erase(const shared_ptr<node>& ind){//必然存在
+        real_splay(ind);
         
     }//删除相关的指针，哪怕有多个
     inline void erase(uint k){
         auto&& ind=get_ptr_by_rk(k);
         ind->cnt--,ind->size--;
-        if(ind->cnt&&!is_root(ind)) pushup()
+        if(ind->cnt&&!is_root(ind)) pushup(get<weak_ptr<node>>(ind->fa).lock());
+        else erase(ind);
     }//只删除排名为k的（1个val）
     inline void erase(const answer_type& val){
         
@@ -281,17 +296,11 @@ public:
 
     inline void reverse(){if(rt!=nullptr) rt->reverse_tag^=true;}
     inline void reverse(const uint& l,const uint& r){
-        auto&& [x,t]=split_by_rk(l-1,rt);
-        auto&& [y,z]=split_by_rk(r-l+1,t);
-        if(y!=nullptr) y->reverse_tag^=true;
-        rt=merge(x,merge(y,z)),set_tree();
+        
     }
     inline void modify(const input_type& val){if(rt!=nullptr) rt->val=assign(rt->val,val),rt->tag=pushdown(rt->tag,val);}
     inline void modify(const uint& l,const uint& r,const input_type& val){
-        auto&& [x,t]=split_by_rk(l-1,rt);
-        auto&& [y,z]=split_by_rk(r-l+1,t);
-        if(y!=nullptr) y->val=assign(y->val,val),y->tag=pushdown(y->tag,val);
-        rt=merge(x,merge(y,z)),set_tree();
+        
     }
     
     inline void split(){
