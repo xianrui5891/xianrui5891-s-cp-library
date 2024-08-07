@@ -246,7 +246,7 @@ protected:
     inline shared_ptr<node> prev(uint k,const shared_ptr<node>& _rt_){return get_ptr_by_rk(k-1,_rt_);}
     inline shared_ptr<node> prev(const answer_type& val,const shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk(val,_rt_)-1,_rt_);}
     inline shared_ptr<node> next(uint k,const shared_ptr<node>& _rt_){return get_ptr_by_rk(k+1,_rt_);}
-    inline shared_ptr<node> next(const answer_type& val,const shared_ptr<node>& ind){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp,_rt_),_rt_);}
+    inline shared_ptr<node> next(const answer_type& val,const shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp,_rt_),_rt_);}
 
     inline void insert(const shared_ptr<node>& ind,shared_ptr<node>& _rt_){//ind->val可能不存在
         auto&& [x,y]=split_by_pred(ind->val,_rt_,strong_comp);
@@ -281,6 +281,14 @@ protected:
         auto&& [x,t]=split_by_rk(l-1,_rt_);
         auto&& [y,z]=split_by_rk(r-l+1,t);
         if(y!=nullptr) y->reverse_tag^=true;
+        _rt_=merge(x,merge(y,z)),set_tree(_rt_);
+    }
+
+    inline void modify(const input_type& val,const shared_ptr<node>& _rt_){if(_rt_!=nullptr) _rt_->val=assign(_rt_->val,val),_rt_->tag=pushdown(_rt_->tag,val);}
+    inline void modify(const uint& l,const uint& r,const input_type& val,shared_ptr<node>& _rt_){
+        auto&& [x,t]=split_by_rk(l-1,_rt_);
+        auto&& [y,z]=split_by_rk(r-l+1,t);
+        if(y!=nullptr) y->val=assign(y->val,val),y->tag=pushdown(y->tag,val);
         _rt_=merge(x,merge(y,z)),set_tree(_rt_);
     }
 public:
@@ -355,13 +363,9 @@ public:
     inline void reverse(){if(rt!=nullptr) rt->reverse_tag^=true;}
     inline void reverse(const uint& l,const uint& r){reverse(l,r,rt);}
 
-    inline void modify(const input_type& val,const shared_ptr<node>& _rt_){if(_rt_!=nullptr) _rt_->val=assign(_rt_->val,val),_rt_->tag=pushdown(_rt_->tag,val);}
-    inline void modify(const uint& l,const uint& r,const input_type& val,shared_ptr<node>& _rt_){
-        auto&& [x,t]=split_by_rk(l-1,_rt_);
-        auto&& [y,z]=split_by_rk(r-l+1,t);
-        if(y!=nullptr) y->val=assign(y->val,val),y->tag=pushdown(y->tag,val);
-        _rt_=merge(x,merge(y,z)),set_tree(_rt_);
-    }
+    inline void modify(const input_type& val){if(rt!=nullptr) rt->val=assign(rt->val,val),rt->tag=pushdown(rt->tag,val);}
+    inline void modify(const uint& l,const uint& r,const input_type& val){modify(l,r,val,rt);}
+
     inline void to_vector(vector<answer_type> &x){to_vector(x,rt);}
     // inline ~fhq_treap(){
     //     cout<<this<<'\n';
