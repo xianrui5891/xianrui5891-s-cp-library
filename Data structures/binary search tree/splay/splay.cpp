@@ -113,7 +113,7 @@ protected:
             if constexpr(!is_same_v<pushup_oper,default_empty<answer_type>>) ind->val=pushup(ind->val,ind->rs->val);
         }
     }
-    
+protected: 
     inline void rotate(const shared_ptr<node> &ind){
         assert(!is_root(ind));
         auto&& fa=get<0>(ind->fa).lock();
@@ -127,29 +127,25 @@ protected:
         }
         pushup(fa),pushup(ind);
     }
-
-    inline void to_vector(vector<answer_type> &x,const shared_ptr<node>& ind){
-        if(ind==nullptr) return;
-        real_pushdown(ind),to_vector(x,ind->ls),x.pb(ind->val),to_vector(x,ind->rs);
-    }
-    inline void to_vector(vector<answer_type> &x){to_vector(x,rt);}
-public:
-    inline void real_splay(const shared_ptr<node> &ind){
+    inline void real_splay(const shared_ptr<node> &ind,shared_ptr<node>& _rt_){
         if(ind==nullptr) return;
         for(;!isroot(ind);rotate(ind)){
             if(auto& fa=get<0>(ind->fa).lock();!is_root(fa)) 
                 rotate(((get<0>(fa->fa).lock()->ls==fa)^(fa->ls==ind))?ind:fa);
         }
-        rt=ind,set_tree();
+        _rt_=ind,set_tree(_rt_);
     }
-    inline void real_splay(const shared_ptr<node> &ind,const shared_ptr<node> goal){
+    inline void real_splay(const shared_ptr<node> &ind,const shared_ptr<node>& goal,shared_ptr<node>& _rt_){
         if(ind==nullptr) return;
         for(;!is_root(ind)||get<0>(ind->fa).lock()!=goal;rotate(ind)){
             if(auto&& fa=get<0>(ind->fa).lock();!is_root(fa)) 
                 rotate(((get<0>(fa->fa).lock()->ls==fa)^(fa->ls==ind))?ind:fa);
         }
-        if(goal==nullptr) rt=ind,set_tree();
+        if(goal==nullptr) _rt_=ind,set_tree(_rt_);
     }
+public:
+    inline void real_splay_rt(const shared_ptr<node> &ind){real_splay(ind,rt);}
+    inline void real_splay_rt(const shared_ptr<node> &ind,const shared_ptr<node>& goal){real_splay(ind,goal,rt);}
 public:
     inline void clear(){rt.reset();}
     inline shared_ptr<node> get_rt(){return rt;}
@@ -170,7 +166,7 @@ public:
             real_pushup(ind);
             return;
         };
-        real_build(in,0,in.size()-1);
+        real_build(rt,0,in.size()-1);
         set_tree();
     }
 
@@ -196,17 +192,9 @@ public:
     constexpr inline splay& operator=(tp&& _tr)=default;
     constexpr inline tp& operator=(shared_ptr<node>&& _rt){rt=exchange(_rt,nullptr),set_tree();return *this;}
 protected:
-
-public:
-    inline uint get_rk(shared_ptr<node> ind){
-        if(ind==nullptr) return 0;
-        real_splay(ind);
-        return get_size(ind->ls)+1;
-    }
-    
     template<typename binary_pred_for_answer_t> 
-    inline uint get_rk_by_pred(const answer_type& val,shared_ptr<node> ind,const binary_pred_for_answer_t& pred){
-        shared_ptr<node> lst;
+    inline uint get_rk_by_pred(const answer_type& val,shared_ptr<node>& _rt_,const binary_pred_for_answer_t& pred){
+        shared_ptr<node> lst,ind=_rt_;
         uint res=0;
         while(ind!=nullptr){
             if(pred(ind->val,val)){
@@ -216,46 +204,38 @@ public:
             }
             else ind=ind->ls;
         }
-        real_splay(lst);
+        real_splay(lst,_rt_);
         return res+1;
     }//排名从1开始
-    template<typename binary_pred_for_answer_t> 
-    inline uint get_rk_by_pred(const answer_type& val,const binary_pred_for_answer_t& pred){return get_rk_by_pred(val,rt,pred);}//排名从1开始
     inline uint get_rk(const answer_type& val,const shared_ptr<node>& ind){return get_rk_by_pred(val,ind,strong_comp);}
-    inline uint get_rk(const answer_type& val){return get_rk_by_pred(val,rt,strong_comp);}
 
-    inline shared_ptr<node> get_ptr_by_rk(uint k,shared_ptr<node> ind){
-        if(k<1||k>get_size(ind)) return nullptr;
+    inline shared_ptr<node> get_ptr_by_rk(uint k,shared_ptr<node>& _rt_){
+        if(k<1||k>get_size(_rt_)) return nullptr;
+        auto ind=_rt_;
         while(ind!=nullptr){
             uint lsiz=get_size(ind->ls);
-            if(lsiz<k&&k<=lsiz+ind->cnt) return real_splay(ind),ind;
+            if(lsiz<k&&k<=lsiz+ind->cnt) return real_splay(ind,_rt_),ind;
             else if(k<=lsiz) ind=ind->ls;
             else k-=lsiz+ind->cnt,ind=ind->rs;
         }
         return nullptr;
     }//排名从1开始
-    inline shared_ptr<node> get_ptr_by_rk(uint x){return get_ptr_by_rk(x,rt);}//排名从1开始
 
-    inline shared_ptr<node> prev(uint k){return get_ptr_by_rk(k-1);}
-    inline shared_ptr<node> prev(const shared_ptr<node>& ind){return get_ptr_by_rk(get_rk(ind)-1);}
-    inline shared_ptr<node> prev(const answer_type& val){return get_ptr_by_rk(get_rk(val)-1);}
+    inline shared_ptr<node> prev(uint k,shared_ptr<node>& _rt_){return get_ptr_by_rk(k-1,_rt_);}
+    inline shared_ptr<node> prev(const answer_type& val,shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk(val,_rt_)-1,_rt_);}
+    inline shared_ptr<node> next(uint k,shared_ptr<node>& _rt_){return get_ptr_by_rk(k+1,_rt_);}
+    inline shared_ptr<node> next(const answer_type& val,shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp,_rt_),_rt_);}
 
-    inline shared_ptr<node> next(uint k){return get_ptr_by_rk(k+1);}
-    inline shared_ptr<node> next(const shared_ptr<node>& ind){return get_ptr_by_rk(get_rk(ind)+ind->cnt);}//ind只能是存在的
-    inline shared_ptr<node> next(const answer_type& val){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp));}
-    
-    inline void insert(uint k,const shared_ptr<node>& _ptr_){
-        auto ind=rt;
-        shared_ptr<node> lst;
-        assert(k>=1&&k<=get_size(rt));
+    inline void insert(uint k,const shared_ptr<node>& _ptr_,shared_ptr<node>& _rt_){
+        assert(k>=1&&k<=get_size(_rt_));
+        shared_ptr<node> lst,ind=_rt_;
         k--;
         bool flg;
         while(ind!=nullptr){
             uint lsiz=get_size(ind->ls);
             lst=ind;
             if(lsiz<k&&k<=lsiz+ind->cnt){
-                real_splay(ind);
-
+                real_splay(ind,_rt_);
                 break;
             }
             else if(k<=lsiz) ind=ind->ls;
@@ -263,11 +243,10 @@ public:
         }
         if(!flg) lst->ls=_ptr_;
         else _ptr_->rs=lst->rs,lst->rs=_ptr_;
-        real_splay(_ptr_);
+        real_splay(_ptr_,_rt_);
     }//插到k+1位置上，标号1开始
-    inline void insert(const shared_ptr<node>& _ptr_){//ind->val可能不存在
-        auto ind=rt;
-        shared_ptr<node> lst;
+    inline void insert(const shared_ptr<node>& _ptr_,shared_ptr<node>& _rt_){//ind->val可能不存在
+        shared_ptr<node> lst,ind=_rt_;
         while(ind!=nullptr){
             lst=ind;
             if(pred(ind->val,_ptr_->val)) ind=ind->rs;
@@ -275,33 +254,68 @@ public:
         }
         if(strong_comp(lst->val)) lst->rs=_ptr_;
         else lst.ls=_ptr_;
-        real_splay(_ptr_);
+        real_splay(_ptr_,_rt_);
     }
-    inline void insert(uint k,const input_type& val){insert(k,apply_newnode(assign(answer_type_e,val)));}
-    inline void insert(const input_type& val){insert(apply_newnode(assign(answer_type_e,val)));}
+    inline void insert(uint k,const input_type& val,shared_ptr<node>& _rt_){insert(k,apply_newnode(assign(answer_type_e,val)),_rt_);}
+    inline void insert(const input_type& val,shared_ptr<node>& _rt_){insert(apply_newnode(assign(answer_type_e,val)),_rt_);}
 
-    inline void erase(const shared_ptr<node>& ind){//必然存在
+    inline void erase(const shared_ptr<node>& ind,shared_ptr<node>& _rt_){//必然存在
         real_splay(ind);
         
     }//删除相关的指针，哪怕有多个
-    inline void erase(uint k){
-        auto&& ind=get_ptr_by_rk(k);
+    inline void erase(uint k,shared_ptr<node>& _rt_){
+        auto&& ind=get_ptr_by_rk(k,_rt_);
         ind->cnt--,ind->size--;
         if(ind->cnt&&!is_root(ind)) pushup(get<weak_ptr<node>>(ind->fa).lock());
-        else erase(ind);
+        else erase(ind,_rt_);
     }//只删除排名为k的（1个val）
-    inline void erase(const answer_type& val){
+    inline void erase(const answer_type& val,shared_ptr<node>& _rt_){
         
     }//相同的数值全删
 
+    inline void reverse(const shared_ptr<node>& _rt_){if(_rt_!=nullptr) _rt_->reverse_tag^=true;}
+    inline void reverse(const uint& l,const uint& r,shared_ptr<node>& _rt_){
+        
+    }
+    inline void modify(const input_type& val,const shared_ptr<node>& _rt_){if(_rt_!=nullptr) _rt_->val=assign(_rt_->val,val),_rt_->tag=pushdown(_rt_->tag,val);}
+    inline void modify(const uint& l,const uint& r,const input_type& val,shared_ptr<node>& _rt_){
+        
+    }
+
+    inline void to_vector(vector<answer_type> &x,const shared_ptr<node>& ind){
+        if(ind==nullptr) return;
+        real_pushdown(ind),to_vector(x,ind->ls),x.pb(ind->val),to_vector(x,ind->rs);
+    }
+public:
+    inline uint get_rk(shared_ptr<node> ind){
+        if(ind==nullptr) return 0;
+        real_splay(ind);
+        return get_size(ind->ls)+1;
+    }
+
+    template<typename binary_pred_for_answer_t> 
+    inline uint get_rk_by_pred(const answer_type& val,const binary_pred_for_answer_t& pred){return get_rk_by_pred(val,rt,pred);}//排名从1开始
+    inline uint get_rk(const answer_type& val){return get_rk_by_pred(val,rt,strong_comp);}
+    inline shared_ptr<node> get_ptr_by_rk(uint x){return get_ptr_by_rk(x,rt);}//排名从1开始
+
+    inline shared_ptr<node> prev(uint k,const shared_ptr<node>& _rt_){return get_ptr_by_rk(k-1,_rt_);}
+    inline shared_ptr<node> prev(const answer_type& val,const shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk(val,_rt_)-1,_rt_);}
+    inline shared_ptr<node> next(uint k,const shared_ptr<node>& _rt_){return get_ptr_by_rk(k+1,_rt_);}
+    inline shared_ptr<node> next(const answer_type& val,const shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp,_rt_),_rt_);}
+
+    inline void insert(uint k,const shared_ptr<node>& _ptr_){insert(k,ptr,rt);}
+    inline void insert(const shared_ptr<node>& _ptr_){insert(ptr,rt);}
+    inline void insert(uint k,const input_type& val){insert(k,apply_newnode(assign(answer_type_e,val)),rt);}
+    inline void insert(const input_type& val){insert(apply_newnode(assign(answer_type_e,val)),rt);}
+
+    inline void erase(const shared_ptr<node>& ind){erase(ind,rt);}
+    inline void erase(uint k){erase(k,rt);}
+    inline void erase(const answer_type& val){erase(val,rt);}
+
     inline void reverse(){if(rt!=nullptr) rt->reverse_tag^=true;}
-    inline void reverse(const uint& l,const uint& r){
-        
-    }
+    inline void reverse(const uint& l,const uint& r){reverse(l,r,rt);}
     inline void modify(const input_type& val){if(rt!=nullptr) rt->val=assign(rt->val,val),rt->tag=pushdown(rt->tag,val);}
-    inline void modify(const uint& l,const uint& r,const input_type& val){
-        
-    }
+    inline void modify(const uint& l,const uint& r,const input_type& val){modify(l,r,val,rt);}
     
     inline void split(){
         
@@ -311,6 +325,7 @@ public:
     }
     template<typename ...arg> inline tp& merge(tp&& _tree_,arg&& ...tree_2){merge(forward<tp>(_tree_)),merge(forward<tp>(tree_2)...); return *this;}
 
+    inline void to_vector(vector<answer_type> &x){to_vector(x,rt);}
 protected:
     #undef tp
 };

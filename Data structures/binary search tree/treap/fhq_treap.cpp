@@ -169,11 +169,6 @@ protected:
             return iny;
         }
     }//merge的主inx是左，iny是右,key大的在上
-
-    inline void to_vector(vector<answer_type> &x,const shared_ptr<node>& ind){
-        if(ind==nullptr) return;
-        real_pushdown(ind),to_vector(x,ind->ls),x.pb(ind->val),to_vector(x,ind->rs);
-    } 
 public:
     inline void clear(){rt.reset();}
     inline shared_ptr<node> get_rt(){return rt;}
@@ -291,6 +286,11 @@ protected:
         if(y!=nullptr) y->val=assign(y->val,val),y->tag=pushdown(y->tag,val);
         _rt_=merge(x,merge(y,z)),set_tree(_rt_);
     }
+
+    inline void to_vector(vector<answer_type> &x,const shared_ptr<node>& ind){
+        if(ind==nullptr) return;
+        real_pushdown(ind),to_vector(x,ind->ls),x.pb(ind->val),to_vector(x,ind->rs);
+    } 
 public:
     inline pair<tp,tp> split_by_rk(const uint& k){
         auto&& [x,y]=split_by_rk(k,rt);
