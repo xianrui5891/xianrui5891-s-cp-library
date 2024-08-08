@@ -117,6 +117,7 @@ protected:
     inline void rotate(const shared_ptr<node> &ind){
         assert(!is_root(ind));
         auto&& fa=get<0>(ind->fa).lock();
+        real_pushdown(fa),real_pushdown(ind);
         if(ind==fa->ls) fa->ls=ind->rs,ind->rs=fa;
         else fa->rs=ind->ls,ind->ls=fa;
         if(!is_root(fa)){
@@ -192,6 +193,12 @@ public:
     constexpr inline splay& operator=(tp&& _tr)=default;
     constexpr inline tp& operator=(shared_ptr<node>&& _rt){rt=exchange(_rt,nullptr),set_tree();return *this;}
 protected:
+    inline uint get_rk(const shared_ptr<node>& ind,shared_ptr<node> &_rt_){
+        if(ind==nullptr) return 0;
+        real_splay(ind,_rt_);
+        return get_size(ind->ls)+1;
+    }
+    
     template<typename binary_pred_for_answer_t> 
     inline uint get_rk_by_pred(const answer_type& val,shared_ptr<node>& _rt_,const binary_pred_for_answer_t& pred){
         shared_ptr<node> lst,ind=_rt_;
@@ -222,9 +229,19 @@ protected:
     }//排名从1开始
 
     inline shared_ptr<node> prev(uint k,shared_ptr<node>& _rt_){return get_ptr_by_rk(k-1,_rt_);}
+    inline shared_ptr<node> prev(const shared_ptr<node>& ind,shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk(ind,_rt_)-1,_rt_);}
     inline shared_ptr<node> prev(const answer_type& val,shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk(val,_rt_)-1,_rt_);}
+
     inline shared_ptr<node> next(uint k,shared_ptr<node>& _rt_){return get_ptr_by_rk(k+1,_rt_);}
+    inline shared_ptr<node> next(const shared_ptr<node>& ind,shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk(ind,_rt_)+ind->cnt,_rt_);}//ind只能是存在的
     inline shared_ptr<node> next(const answer_type& val,shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp,_rt_),_rt_);}
+
+    inline shared_ptr<node>& select(const uint& l,const uint& r,shared_ptr<node>& _rt_){
+
+    }
+    inline shared_ptr<node>& select(const answer_type& val,shared_ptr<node>& _rt_){
+
+    }
 
     inline void insert(uint k,const shared_ptr<node>& _ptr_,shared_ptr<node>& _rt_){
         assert(k>=1&&k<=get_size(_rt_));
@@ -260,9 +277,10 @@ protected:
     inline void insert(const input_type& val,shared_ptr<node>& _rt_){insert(apply_newnode(assign(answer_type_e,val)),_rt_);}
 
     inline void erase(const shared_ptr<node>& ind,shared_ptr<node>& _rt_){//必然存在
-        real_splay(ind);
-        
-    }//删除相关的指针，哪怕有多个
+        auto pre=prev(ind,_rt_);
+        if(pre==nullptr) _rt_=ind->rs,set_tree(_rt_);
+        else pre->rs=ind->rs,real_pushup(pre);
+    }//删除单个指针，无视内部数值
     inline void erase(uint k,shared_ptr<node>& _rt_){
         auto&& ind=get_ptr_by_rk(k,_rt_);
         ind->cnt--,ind->size--;
@@ -270,16 +288,20 @@ protected:
         else erase(ind,_rt_);
     }//只删除排名为k的（1个val）
     inline void erase(const answer_type& val,shared_ptr<node>& _rt_){
-        
+        auto ind=select(val,_rt_)->get_fa();
+        if(ind==nullptr) _rt_=nullptr;
+        else ind->ls=nullptr,real_pushup(ind);
     }//相同的数值全删
 
     inline void reverse(const shared_ptr<node>& _rt_){if(_rt_!=nullptr) _rt_->reverse_tag^=true;}
     inline void reverse(const uint& l,const uint& r,shared_ptr<node>& _rt_){
-        
+        auto &ind=select(l,r,_rt_);
+        ind->reverse_tag^=true;
     }
     inline void modify(const input_type& val,const shared_ptr<node>& _rt_){if(_rt_!=nullptr) _rt_->val=assign(_rt_->val,val),_rt_->tag=pushdown(_rt_->tag,val);}
     inline void modify(const uint& l,const uint& r,const input_type& val,shared_ptr<node>& _rt_){
-        
+        auto &ind=select(l,r,_rt_);
+        ind->val=assign(_rt_->val,val),ind->tag=pushdown(ind->tag,val);
     }
 
     inline void to_vector(vector<answer_type> &x,const shared_ptr<node>& ind){
@@ -287,9 +309,9 @@ protected:
         real_pushdown(ind),to_vector(x,ind->ls),x.pb(ind->val),to_vector(x,ind->rs);
     }
 public:
-    inline uint get_rk(shared_ptr<node> ind){
+    inline uint get_rk(const shared_ptr<node>& ind){
         if(ind==nullptr) return 0;
-        real_splay(ind);
+        real_splay(ind,rt);
         return get_size(ind->ls)+1;
     }
 
@@ -298,10 +320,13 @@ public:
     inline uint get_rk(const answer_type& val){return get_rk_by_pred(val,rt,strong_comp);}
     inline shared_ptr<node> get_ptr_by_rk(uint x){return get_ptr_by_rk(x,rt);}//排名从1开始
 
-    inline shared_ptr<node> prev(uint k,const shared_ptr<node>& _rt_){return get_ptr_by_rk(k-1,_rt_);}
-    inline shared_ptr<node> prev(const answer_type& val,const shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk(val,_rt_)-1,_rt_);}
-    inline shared_ptr<node> next(uint k,const shared_ptr<node>& _rt_){return get_ptr_by_rk(k+1,_rt_);}
-    inline shared_ptr<node> next(const answer_type& val,const shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp,_rt_),_rt_);}
+    inline shared_ptr<node> prev(uint k){return get_ptr_by_rk(k-1);}
+    inline shared_ptr<node> prev(const shared_ptr<node>& ind){return get_ptr_by_rk(get_rk(ind)-1);}
+    inline shared_ptr<node> prev(const answer_type& val){return get_ptr_by_rk(get_rk(val)-1);}
+
+    inline shared_ptr<node> next(uint k){return get_ptr_by_rk(k+1);}
+    inline shared_ptr<node> next(const shared_ptr<node>& ind){return get_ptr_by_rk(get_rk(ind)+ind->cnt);}
+    inline shared_ptr<node> next(const answer_type& val){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp));}
 
     inline void insert(uint k,const shared_ptr<node>& _ptr_){insert(k,ptr,rt);}
     inline void insert(const shared_ptr<node>& _ptr_){insert(ptr,rt);}
@@ -317,7 +342,7 @@ public:
     inline void modify(const input_type& val){if(rt!=nullptr) rt->val=assign(rt->val,val),rt->tag=pushdown(rt->tag,val);}
     inline void modify(const uint& l,const uint& r,const input_type& val){modify(l,r,val,rt);}
     
-    inline void split(){
+    inline pair<tp,tp> split(){
         
     }
     inline tp& merge(){
