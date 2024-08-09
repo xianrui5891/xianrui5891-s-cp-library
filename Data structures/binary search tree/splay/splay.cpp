@@ -236,11 +236,37 @@ protected:
     inline shared_ptr<node> next(const shared_ptr<node>& ind,shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk(ind,_rt_)+ind->cnt,_rt_);}//ind只能是存在的
     inline shared_ptr<node> next(const answer_type& val,shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp,_rt_),_rt_);}
 
-    inline shared_ptr<node>& select(const uint& l,const uint& r,shared_ptr<node>& _rt_){
-
+    inline shared_ptr<node> select(const uint& l,const uint& r,shared_ptr<node>& _rt_){
+        auto pre_rk=get_ptr_by_rk(l-1,_rt_),pre_ind=prev(get_ptr_by_rk(l,_rt_),_rt_);
+        if(pre_rk!=pre_ind){
+            uint _tmp_rk=get_rk(pre_rk);
+            auto newone=apply_newnode(pre_rk->val,pre_rk->cnt+_tmp_rk-l);
+            pre_rk->cnt=l-_tmp_rk;
+            newone->rs=pre->rs;
+            pre_rs=newone;
+            pushup(newone),pushup(pre_rk);
+        }//拆点,把pre_rk这个点拆成两个 大小分别为 l-_tmp_rk,pre_rk->cnt+_tmp_rk-l
+        auto nex_rk=get_ptr_by_rk(r+1,_rt_),nex_ind=nex(get_ptr_by_rk(r,_rt_),_rt_);
+        if(nex_rk!=nex_ind){
+            uint _tmp_rk=get_rk(nex_rk);
+            auto newone=apply_newnode(nex_rk->val,r-_tmp_rk+1);
+            nex_rk_cnt=nex_rk->cnt+_tmp_rk-r-1;
+            newone->ls=nex_rk->ls;
+            nex_rk->ls=newone;
+            pushup(newone),pushup(nex_rk);
+        }//同理 分别为 r-_tmp_rk+1,nex_rk->cnt+_tmp_rk-r-1
+        //注意下方splay的东西
+        eal_splay(pre_rk,_rt_),real_splay(nex_rk,pre,_rt_);
+        auto ind=_rt_;
+        for(tot==(uint)(pre_rk!=nullptr)+(uint)(nex_rk!=nullptr);tot;--tot) ind=ind->rs;
+        return ind;
     }
-    inline shared_ptr<node>& select(const answer_type& val,shared_ptr<node>& _rt_){
-
+    inline shared_ptr<node> select(const answer_type& val,shared_ptr<node>& _rt_){
+        auto pre=prev(val,_rt_),nex=next(val);
+        real_splay(pre,_rt_),real_splay(nex,pre,_rt_);
+        auto ind=_rt_;
+        for(tot==(uint)(pre!=nullptr)+(uint)(nex!=nullptr);tot;--tot) ind=ind->rs;
+        return ind;
     }
 
     inline void insert(uint k,const shared_ptr<node>& _ptr_,shared_ptr<node>& _rt_){
