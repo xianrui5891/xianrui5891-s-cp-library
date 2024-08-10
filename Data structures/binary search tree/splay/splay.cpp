@@ -258,14 +258,16 @@ protected:
         //注意下方splay的东西
         eal_splay(pre_rk,_rt_),real_splay(nex_rk,pre,_rt_);
         auto ind=_rt_;
-        for(tot==(uint)(pre_rk!=nullptr)+(uint)(nex_rk!=nullptr);tot;--tot) ind=ind->rs;
+        if(pre_rk!=nullptr) ind=ind->rs;
+        if(nex_rk!=nullptr) ind=ind->ls;
         return ind;
     }
     inline shared_ptr<node> select(const answer_type& val,shared_ptr<node>& _rt_){
-        auto pre=prev(val,_rt_),nex=next(val);
+        auto pre=prev(val,_rt_),nex=next(val,_rt_);
         real_splay(pre,_rt_),real_splay(nex,pre,_rt_);
         auto ind=_rt_;
-        for(tot==(uint)(pre!=nullptr)+(uint)(nex!=nullptr);tot;--tot) ind=ind->rs;
+        if(pre_rk!=nullptr) ind=ind->rs;
+        if(nex_rk!=nullptr) ind=ind->ls;
         return ind;
     }
 
@@ -329,7 +331,7 @@ protected:
         auto &ind=select(l,r,_rt_);
         ind->val=assign(_rt_->val,val),ind->tag=pushdown(ind->tag,val);
     }
-
+    
     inline void to_vector(vector<answer_type> &x,const shared_ptr<node>& ind){
         if(ind==nullptr) return;
         real_pushdown(ind),to_vector(x,ind->ls),x.pb(ind->val),to_vector(x,ind->rs);
@@ -368,14 +370,6 @@ public:
     inline void modify(const input_type& val){if(rt!=nullptr) rt->val=assign(rt->val,val),rt->tag=pushdown(rt->tag,val);}
     inline void modify(const uint& l,const uint& r,const input_type& val){modify(l,r,val,rt);}
     
-    inline pair<tp,tp> split(){
-        
-    }
-    inline tp& merge(){
-
-    }
-    template<typename ...arg> inline tp& merge(tp&& _tree_,arg&& ...tree_2){merge(forward<tp>(_tree_)),merge(forward<tp>(tree_2)...); return *this;}
-
     inline void to_vector(vector<answer_type> &x){to_vector(x,rt);}
 protected:
     #undef tp
