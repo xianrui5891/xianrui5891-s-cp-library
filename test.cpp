@@ -1,179 +1,145 @@
-// author: (ttzytt)[ttzytt.com]
 #include <bits/stdc++.h>
+#define ll long long
+#define ull unsigned ll
+#define lll __int128
+#define db double
+#define gc getchar
+#define pc putchar
+#define rg register
 using namespace std;
-mt19937 rnd(time(0));
-struct Node {
-  Node *ch[2];
-  int val, prio;
-  int cnt;
-  int siz;
 
-  Node(int _val) : val(_val), cnt(1), siz(1) {
-    ch[0] = ch[1] = nullptr;
-    prio = rnd();
-  }
+inline ll read(){
+    ll t1=0,t2=1;
+    char t3=gc();
+    for(;!isdigit(t3);t3=gc()) if(t3=='-') t2=-1;
+    for(;isdigit(t3);t3=gc()) t1=(t1<<1)+(t1<<3)+(t3^48);
+    return t2*t1;
+}
 
-  Node(Node *_node) {
-    val = _node->val, prio = _node->prio, cnt = _node->cnt, siz = _node->siz;
-  }
+template<typename T>
+inline void write(T t1){
+    if(t1<0) t1=-t1,pc('-');
+    if(t1>9) write(t1/10);
+    pc(t1%10+'0');
+}
 
-  void upd_siz() {
-    siz = cnt;
-    if (ch[0] != nullptr) siz += ch[0]->siz;
-    if (ch[1] != nullptr) siz += ch[1]->siz;
-  }
+const int msiz=1e5+15;
+int n;
+
+int tot,rt;
+struct splaytree{
+	int lc,rc,siz,fa,cnt,val;
+	inline void get(int x){
+		lc=rc=siz=fa=0,siz=cnt=1,val=x;
+	}
+	inline void clear(){
+		lc=rc=siz=fa=cnt=val=0;
+	}
 };
+splaytree tr[msiz];
 
-struct none_rot_treap {
-#define _3 second.second
-#define _2 second.first
-  Node *root;
+#define ls tr[ind].lc
+#define rs tr[ind].rc
+#define faa tr[ind].fa
+#define chk(ind) (tr[tr[ind].fa].rc==ind)
 
-  pair<Node *, Node *> split(Node *cur, int key) {
-    if (cur == nullptr) return {nullptr, nullptr};
-    if (cur->val <= key) {
-      auto temp = split(cur->ch[1], key);
-      cur->ch[1] = temp.first;
-      cur->upd_siz();
-      return {cur, temp.second};
-    } else {
-      auto temp = split(cur->ch[0], key);
-      cur->ch[0] = temp.second;
-      cur->upd_siz();
-      return {temp.first, cur};
-    }
-  }
+inline void pushup(int ind){
+	tr[ind].siz=tr[ls].siz+tr[rs].siz+tr[ind].cnt;
+}
 
-  tuple<Node *, Node *, Node *> split_by_rk(Node *cur, int rk) {
-    if (cur == nullptr) return {nullptr, nullptr, nullptr};
-    int ls_siz = cur->ch[0] == nullptr ? 0 : cur->ch[0]->siz;
-    if (rk <= ls_siz) {
-      Node *l, *mid, *r;
-      tie(l, mid, r) = split_by_rk(cur->ch[0], rk);
-      cur->ch[0] = r;
-      cur->upd_siz();
-      return {l, mid, cur};
-    } else if (rk <= ls_siz + cur->cnt) {
-      Node *lt = cur->ch[0];
-      Node *rt = cur->ch[1];
-      cur->ch[0] = cur->ch[1] = nullptr;
-      return {lt, cur, rt};
-    } else {
-      Node *l, *mid, *r;
-      tie(l, mid, r) = split_by_rk(cur->ch[1], rk - ls_siz - cur->cnt);
-      cur->ch[1] = l;
-      cur->upd_siz();
-      return {cur, mid, r};
-    }
-  }
+inline int newnode(int x){
+	tr[++tot].get(x);
+	return tot;
+}
 
-  Node *merge(Node *u, Node *v) {
-    if (u == nullptr && v == nullptr) return nullptr;
-    if (u != nullptr && v == nullptr) return u;
-    if (v != nullptr && u == nullptr) return v;
-    if (u->prio < v->prio) {
-      u->ch[1] = merge(u->ch[1], v);
-      u->upd_siz();
-      return u;
-    } else {
-      v->ch[0] = merge(u, v->ch[0]);
-      v->upd_siz();
-      return v;
-    }
-  }
+inline void rotate(int ind){
+	assert(faa!=0);
+	int x=faa,y=tr[x].fa,k=chk(ind);
+	chk(x)?(tr[y].rc=ind):(tr[y].lc=ind),faa=y;
+	if(k) tr[x].rc=ls,tr[ls].fa=x,ls=x;
+	else tr[x].lc=rs,tr[rs].fa=x,rs=x;
+	tr[x].fa=ind,pushup(x),pushup(ind);
+}
 
-  void insert(int val) {
-    auto temp = split(root, val);
-    auto l_tr = split(temp.first, val - 1);
-    Node *new_node;
-    if (l_tr.second == nullptr) {
-      new_node = new Node(val);
-    } else {
-      l_tr.second->cnt++;
-      l_tr.second->upd_siz();
-    }
-    Node *l_tr_combined =
-        merge(l_tr.first, l_tr.second == nullptr ? new_node : l_tr.second);
-    root = merge(l_tr_combined, temp.second);
-  }
+inline void splay(int ind,int g){
+	if(!ind) return;
+	for(rg int f=faa;f=faa,f!=g;rotate(ind))
+		if(tr[f].fa) rotate((chk(f)^chk(ind))?ind:f);
+	if(!g) rt=ind;
+}
 
-  void del(int val) {
-    auto temp = split(root, val);
-    auto l_tr = split(temp.first, val - 1);
-    if (l_tr.second->cnt > 1) {
-      l_tr.second->cnt--;
-      l_tr.second->upd_siz();
-      l_tr.first = merge(l_tr.first, l_tr.second);
-    } else {
-      if (temp.first == l_tr.second) {
-        temp.first = nullptr;
-      }
-      delete l_tr.second;
-      l_tr.second = nullptr;
-    }
-    root = merge(l_tr.first, temp.second);
-  }
+inline void insert(int x){
+	if(!rt) return rt=newnode(x),void();
+	int ind=rt,f=0;
+	while(ind&&tr[ind].val!=x) f=ind,ind=(x>tr[ind].val?rs:ls);
+	if(ind) ++tr[ind].cnt;
+	else{
+		ind=newnode(x),faa=f;
+		x>tr[f].val?(tr[f].rc=ind):(tr[f].lc=ind);
+	}
+	splay(ind,0);
+}
 
-  int qrank_by_val(Node *cur, int val) {
-    auto temp = split(cur, val - 1);
-    int ret = (temp.first == nullptr ? 0 : temp.first->siz) + 1;
-    root = merge(temp.first, temp.second);
-    return ret;
-  }
+inline int qryrnk(int k){
+	int res=0,ind=rt;
+	while(ind){
+		if(k<tr[ind].val) ind=ls;
+		else{
+			res+=tr[ls].siz;
+			if(k==tr[ind].val) return splay(ind,0),res+1;
+			res+=tr[ind].cnt,ind=rs;
+		}
+	}
+}
 
-  int qval_by_rank(Node *cur, int rk) {
-    Node *l, *mid, *r;
-    tie(l, mid, r) = split_by_rk(cur, rk);
-    int ret = mid->val;
-    root = merge(merge(l, mid), r);
-    return ret;
-  }
+inline int qrykth(int k){
+	int ind=rt;
+	while(ind){
+		if(k<=tr[ls].siz) ind=ls;
+		else{
+			k-=tr[ind].cnt+tr[ls].siz;
+			if(k<=0) return splay(ind,0),tr[ind].val;
+			ind=rs;
+		}
+	}
+}
 
-  int qprev(int val) {
-    auto temp = split(root, val - 1);
-    int ret = qval_by_rank(temp.first, temp.first->siz);
-    root = merge(temp.first, temp.second);
-    return ret;
-  }
+inline int qrypre(int k){
+	int ind=tr[rt].lc;
+	if(!ind) return tr[ind].val;
+	while(rs) ind=rs;
+	return splay(ind,0),ind;
+}
 
-  int qnex(int val) {
-    auto temp = split(root, val);
-    int ret = qval_by_rank(temp.second, 1);
-    root = merge(temp.first, temp.second);
-    return ret;
-  }
-};
+inline int qrynxt(int k){
+	int ind=tr[rt].rc;
+	if(!ind) return tr[ind].val;
+	while(ls) ind=ls;
+	return splay(ind,0),ind;
+}
 
-none_rot_treap tr;
+inline void delet(int x){
+	qryrnk(x);
+	int ind=rt;
+	if(tr[rt].cnt>1) return --tr[rt].cnt,pushup(rt),void();
+	if(!ls&&!rs) return tr[ind].clear(),rt=0,void();
+	if(!ls) return rt=rs,tr[rt].fa=0,tr[ind].clear(),void();
+	if(!rs) return rt=ls,tr[rt].fa=0,tr[ind].clear(),void();
+	int ty=qrypre(x);
+	splay(ty,0),tr[rs].fa=ty,tr[ty].rc=rs,tr[ind].clear();
+	pushup(ty);
+}  
 
-int main() {
-    ios::sync_with_stdio(false),cin.tie(nullptr),cout.tie(nullptr);
-  
-  int t;
-  cin>>t;
-  while (t--) {
-    int mode;
-    int num;
-    cin>>mode>>num;
-    switch (mode) {
-      case 1:
-        tr.insert(num);
-        break;
-      case 2:
-        tr.del(num);
-        break;
-      case 3:
-        cout<<tr.qrank_by_val(tr.root, num)<<'\n';
-        break;
-      case 4:
-        cout<<tr.qval_by_rank(tr.root, num)<<'\n';
-        break;
-      case 5:
-        cout<<tr.qprev(num)<<'\n';
-        break;
-      case 6:
-        cout<<tr.qnex(num)<<'\n';
-        break;
-    }
-  }
+int main(){
+	n=read();
+	while(n--){
+		int op=read(),x=read();
+		if(op==1) insert(x);
+		if(op==2) delet(x);
+		if(op==3) write(qryrnk(x)),pc('\n');
+		if(op==4) write(qrykth(x)),pc('\n');
+		if(op==5) insert(x),write(tr[qrypre(x)].val),pc('\n'),delet(x);
+		if(op==6) insert(x),write(tr[qrynxt(x)].val),pc('\n'),delet(x);
+	}
+	return 0;
 }

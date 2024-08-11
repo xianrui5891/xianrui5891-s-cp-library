@@ -62,7 +62,11 @@ public:
         inline node():key(),cnt(),size(),val(),tag(),reverse_tag(false),ls(nullptr),rs(nullptr),fa(){};
         inline node(const answer_type &_val_,const input_type &e,int _key,int _size_=1):cnt(_size_),size(_size_),reverse_tag(false){key=_key,val=_val_,tag=e;}
 
-        inline bool is_root(){return get_if<weak_ptr<node>>(&fa)==nullptr;}
+        inline bool is_root()const{
+            if(auto tmp=get_if<weak_ptr<node>>(&fa);tmp==nullptr) return true;
+            else if((*tmp).lock()!=nullptr) return false;
+            return true;
+        }
         inline shared_ptr<node> get_fa(){
             if(is_root()) return nullptr;
             return get<weak_ptr<node>>(fa).lock();

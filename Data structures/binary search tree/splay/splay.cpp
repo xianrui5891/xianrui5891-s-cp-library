@@ -60,7 +60,11 @@ public:
         inline node():cnt(),size(),val(),tag(),reverse_tag(false),ls(nullptr),rs(nullptr),fa(){};
         inline node(const answer_type &_val_,const input_type &e,int _size_=1):cnt(_size_),size(_size_),reverse_tag(false){val=_val_,tag=e;}
 
-        inline bool is_root()const{return get_if<weak_ptr<node>>(&fa)==nullptr;}
+        inline bool is_root()const{
+            if(auto tmp=get_if<weak_ptr<node>>(&fa);tmp==nullptr) return true;
+            else if((*tmp).lock()!=nullptr) return false;
+            return true;
+        }
         inline shared_ptr<node> get_fa(){
             if(is_root()) return nullptr;
             return get<weak_ptr<node>>(fa).lock();
@@ -114,29 +118,30 @@ protected:
         }
     }
 protected: 
-    inline void rotate(const shared_ptr<node> &ind){
+    inline void rotate(const shared_ptr<node>& ind){
+        //if(is_root(ind)) return;
         assert(!is_root(ind));
         auto&& fa=get<0>(ind->fa).lock();
         real_pushdown(fa),real_pushdown(ind);
         if(ind==fa->ls) fa->ls=ind->rs,ind->rs=fa;
         else fa->rs=ind->ls,ind->ls=fa;
         if(!is_root(fa)){
-            auto&& anc=get<0>(ind->fa).lock();
+            auto&& anc=get<0>(fa->fa).lock();
             if(anc->ls==fa) anc->ls=ind;
             else anc->rs=ind;
             ind->fa=anc;
-        }
-        pushup(fa),pushup(ind);
+        }else ind->fa=make_shared<tp>(nullptr);
+        real_pushup(fa),real_pushup(ind);
     }
-    inline void real_splay(const shared_ptr<node> &ind,shared_ptr<node>& _rt_){
+    inline void real_splay(const shared_ptr<node>& ind,shared_ptr<node>& _rt_){
         if(ind==nullptr) return;
-        for(;!isroot(ind);rotate(ind)){
-            if(auto& fa=get<0>(ind->fa).lock();!is_root(fa)) 
+        for(;!is_root(ind);rotate(ind)){
+            if(auto&& fa=get<0>(ind->fa).lock();!is_root(fa)) 
                 rotate(((get<0>(fa->fa).lock()->ls==fa)^(fa->ls==ind))?ind:fa);
         }
         _rt_=ind,set_tree(_rt_);
     }
-    inline void real_splay(const shared_ptr<node> &ind,const shared_ptr<node>& goal,shared_ptr<node>& _rt_){
+    inline void real_splay(const shared_ptr<node>& ind,const shared_ptr<node>& goal,shared_ptr<node>& _rt_){
         if(ind==nullptr) return;
         for(;!is_root(ind)||get<0>(ind->fa).lock()!=goal;rotate(ind)){
             if(auto&& fa=get<0>(ind->fa).lock();!is_root(fa)) 
@@ -237,26 +242,27 @@ protected:
     inline shared_ptr<node> next(const answer_type& val,shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp,_rt_),_rt_);}
 
     inline shared_ptr<node> select(const uint& l,const uint& r,shared_ptr<node>& _rt_){
+        if(l>r) return nullptr;
         auto pre_rk=get_ptr_by_rk(l-1,_rt_),pre_ind=prev(get_ptr_by_rk(l,_rt_),_rt_);
         if(pre_rk!=pre_ind){
             uint _tmp_rk=get_rk(pre_rk);
             auto newone=apply_newnode(pre_rk->val,pre_rk->cnt+_tmp_rk-l);
             pre_rk->cnt=l-_tmp_rk;
-            newone->rs=pre->rs;
-            pre_rs=newone;
-            pushup(newone),pushup(pre_rk);
+            newone->rs=pre_rk->rs;
+            pre_rk->rs=newone;
+            real_pushup(newone),real_pushup(pre_rk);
         }//拆点,把pre_rk这个点拆成两个 大小分别为 l-_tmp_rk,pre_rk->cnt+_tmp_rk-l
         auto nex_rk=get_ptr_by_rk(r+1,_rt_),nex_ind=nex(get_ptr_by_rk(r,_rt_),_rt_);
         if(nex_rk!=nex_ind){
             uint _tmp_rk=get_rk(nex_rk);
             auto newone=apply_newnode(nex_rk->val,r-_tmp_rk+1);
-            nex_rk_cnt=nex_rk->cnt+_tmp_rk-r-1;
+            nex_rk->cnt=nex_rk->cnt+_tmp_rk-r-1;
             newone->ls=nex_rk->ls;
             nex_rk->ls=newone;
-            pushup(newone),pushup(nex_rk);
+            real_pushup(newone),real_pushup(nex_rk);
         }//同理 分别为 r-_tmp_rk+1,nex_rk->cnt+_tmp_rk-r-1
         //注意下方splay的东西
-        eal_splay(pre_rk,_rt_),real_splay(nex_rk,pre,_rt_);
+        real_splay(pre_rk,_rt_),real_splay(nex_rk,pre_rk,_rt_);
         auto ind=_rt_;
         if(pre_rk!=nullptr) ind=ind->rs;
         if(nex_rk!=nullptr) ind=ind->ls;
@@ -266,39 +272,39 @@ protected:
         auto pre=prev(val,_rt_),nex=next(val,_rt_);
         real_splay(pre,_rt_),real_splay(nex,pre,_rt_);
         auto ind=_rt_;
-        if(pre_rk!=nullptr) ind=ind->rs;
-        if(nex_rk!=nullptr) ind=ind->ls;
+        if(pre!=nullptr) ind=ind->rs;
+        if(nex!=nullptr) ind=ind->ls;
         return ind;
     }
 
     inline void insert(uint k,const shared_ptr<node>& _ptr_,shared_ptr<node>& _rt_){
-        assert(k>=1&&k<=get_size(_rt_));
-        shared_ptr<node> lst,ind=_rt_;
-        k--;
-        bool flg;
-        while(ind!=nullptr){
-            uint lsiz=get_size(ind->ls);
-            lst=ind;
-            if(lsiz<k&&k<=lsiz+ind->cnt){
-                real_splay(ind,_rt_);
-                break;
-            }
-            else if(k<=lsiz) ind=ind->ls;
-            else k-=lsiz+ind->cnt,ind=ind->rs;
+        assert(k<=get_size(_rt_));
+        auto&& ind=select(1,k,rt);
+        if(is_root(ind)){
+            _ptr_->ls=ind;
+            real_pushup(_ptr_);
+        }else{
+            auto&& fa=get_fa(ind);
+            fa->ls=_ptr_;
+            _ptr_->ls=ind;
+            real_pushup(_ptr_),real_pushup(fa);
         }
-        if(!flg) lst->ls=_ptr_;
-        else _ptr_->rs=lst->rs,lst->rs=_ptr_;
-        real_splay(_ptr_,_rt_);
+        real_splay(_ptr_);
     }//插到k+1位置上，标号1开始
     inline void insert(const shared_ptr<node>& _ptr_,shared_ptr<node>& _rt_){//ind->val可能不存在
         shared_ptr<node> lst,ind=_rt_;
         while(ind!=nullptr){
             lst=ind;
-            if(pred(ind->val,_ptr_->val)) ind=ind->rs;
+            if(strong_comp(ind->val,_ptr_->val)) ind=ind->rs;
             else ind=ind->ls;
         }
-        if(strong_comp(lst->val)) lst->rs=_ptr_;
-        else lst.ls=_ptr_;
+        if(lst==nullptr){
+            _rt_=_ptr_;
+            return;
+        }
+        else if(strong_comp(lst->val,_ptr_->val)) lst->rs=_ptr_;
+        else lst->ls=_ptr_;
+        real_pushup(lst);
         real_splay(_ptr_,_rt_);
     }
     inline void insert(uint k,const input_type& val,shared_ptr<node>& _rt_){insert(k,apply_newnode(assign(answer_type_e,val)),_rt_);}
@@ -312,7 +318,7 @@ protected:
     inline void erase(uint k,shared_ptr<node>& _rt_){
         auto&& ind=get_ptr_by_rk(k,_rt_);
         ind->cnt--,ind->size--;
-        if(ind->cnt&&!is_root(ind)) pushup(get<weak_ptr<node>>(ind->fa).lock());
+        if(ind->cnt&&!is_root(ind)) real_pushup(get<weak_ptr<node>>(ind->fa).lock());
         else erase(ind,_rt_);
     }//只删除排名为k的（1个val）
     inline void erase(const answer_type& val,shared_ptr<node>& _rt_){
@@ -331,7 +337,7 @@ protected:
         auto &ind=select(l,r,_rt_);
         ind->val=assign(_rt_->val,val),ind->tag=pushdown(ind->tag,val);
     }
-    
+
     inline void to_vector(vector<answer_type> &x,const shared_ptr<node>& ind){
         if(ind==nullptr) return;
         real_pushdown(ind),to_vector(x,ind->ls),x.pb(ind->val),to_vector(x,ind->rs);
@@ -356,8 +362,8 @@ public:
     inline shared_ptr<node> next(const shared_ptr<node>& ind){return get_ptr_by_rk(get_rk(ind)+ind->cnt);}
     inline shared_ptr<node> next(const answer_type& val){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp));}
 
-    inline void insert(uint k,const shared_ptr<node>& _ptr_){insert(k,ptr,rt);}
-    inline void insert(const shared_ptr<node>& _ptr_){insert(ptr,rt);}
+    inline void insert(uint k,const shared_ptr<node>& _ptr_){insert(k,_ptr_,rt);}
+    inline void insert(const shared_ptr<node>& _ptr_){insert(_ptr_,rt);}
     inline void insert(uint k,const input_type& val){insert(k,apply_newnode(assign(answer_type_e,val)),rt);}
     inline void insert(const input_type& val){insert(apply_newnode(assign(answer_type_e,val)),rt);}
 
@@ -377,7 +383,27 @@ protected:
 
 int main(){
     ios::sync_with_stdio(false),cin.tie(nullptr),cout.tie(nullptr);
-    
+    int n;
+    cin>>n;
+    auto assign=[]([[maybe_unused]]int x,int y){return y;};
+    default_empty<int> tmp1;
+    less<int> tmp2;
+    splay<int,int,default_empty<int>,default_empty<int>,decltype(assign)> fhq_tr(tmp1,tmp1,assign,tmp2);
+    while(n--){
+        int opt,x;
+        cin>>opt>>x;
+        if(opt==1) fhq_tr.insert(x);
+        else if(opt==2) fhq_tr.erase(fhq_tr.get_rk(x));
+        else if(opt==3){
+            cout<<fhq_tr.get_rk(x)<<'\n';
+        }else if(opt==4){
+            cout<<fhq_tr.get_ptr_by_rk(x)->val<<'\n';
+        }else if(opt==5){
+            cout<<fhq_tr.prev(x)->val<<'\n';
+        }else{
+            cout<<fhq_tr.next(x)->val<<'\n';
+        }
+    }
     return 0;
 }
 /*
