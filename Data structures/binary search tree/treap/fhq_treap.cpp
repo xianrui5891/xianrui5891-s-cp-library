@@ -224,6 +224,7 @@ protected:
     inline uint get_rk_by_pred(const answer_type& val,shared_ptr<node> ind,const binary_pred_for_answer_t& pred){
         uint res=0;
         while(ind!=nullptr){
+            real_pushdown(ind);
             if(pred(ind->val,val)) res+=get_size(ind->ls)+ind->cnt,ind=ind->rs;
             else ind=ind->ls;
         }
@@ -234,6 +235,7 @@ protected:
     inline shared_ptr<node> get_ptr_by_rk(uint k,shared_ptr<node> ind){
         if(k<1||k>get_size(ind)) return nullptr;
         while(ind!=nullptr){
+            real_pushdown(ind);
             uint lsiz=get_size(ind->ls);
             if(lsiz<k&&k<=lsiz+ind->cnt) return ind;
             else if(k<=lsiz) ind=ind->ls;
@@ -337,6 +339,7 @@ public:
         if(ind==nullptr) return 0;
         uint res=get_size(ind->ls)+1;
         while(!ind->is_root()){
+            real_pushdown(ind);
             auto&& fa_ptr=get<weak_ptr<node>>(ind->fa).lock();
             if(fa_ptr->rs==ind) res+=(fa_ptr->size)-(ind->size);
             ind=fa_ptr;

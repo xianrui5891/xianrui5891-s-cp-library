@@ -62,8 +62,8 @@ public:
 
         inline bool is_root()const{
             if(auto tmp=get_if<weak_ptr<node>>(&fa);tmp==nullptr) return true;
-            else if((*tmp).lock()!=nullptr) return false;
-            return true;
+            else if((*tmp).lock()==nullptr) return true;
+            return false;
         }
         inline shared_ptr<node> get_fa(){
             if(is_root()) return nullptr;
@@ -118,7 +118,7 @@ protected:
         }
     }
 protected: 
-    inline void rotate(const shared_ptr<node>& ind){
+    inline void rotate(const shared_ptr<node>& ind,shared_ptr<node>& _rt_){
         //if(is_root(ind)) return;
         assert(!is_root(ind));
         auto&& fa=get<0>(ind->fa).lock();
@@ -130,22 +130,23 @@ protected:
             if(anc->ls==fa) anc->ls=ind;
             else anc->rs=ind;
             ind->fa=anc;
-        }else ind->fa=make_shared<tp>(nullptr);
+        }else ind->fa=make_shared<tp>(nullptr),_rt_=ind;
         real_pushup(fa),real_pushup(ind);
     }
     inline void real_splay(const shared_ptr<node>& ind,shared_ptr<node>& _rt_){
         if(ind==nullptr) return;
-        for(;!is_root(ind);rotate(ind)){
-            if(auto&& fa=get<0>(ind->fa).lock();!is_root(fa)) 
-                rotate(((get<0>(fa->fa).lock()->ls==fa)^(fa->ls==ind))?ind:fa);
+        for(;!is_root(ind);rotate(ind,_rt_)){
+            if(auto&& fa=get<0>(ind->fa).lock();!is_root(fa)){ 
+                rotate(((get<0>(fa->fa).lock()->ls==fa)==(fa->ls==ind))?fa:ind,_rt_);
+            }
         }
         _rt_=ind,set_tree(_rt_);
     }
     inline void real_splay(const shared_ptr<node>& ind,const shared_ptr<node>& goal,shared_ptr<node>& _rt_){
         if(ind==nullptr) return;
-        for(;!is_root(ind)||get<0>(ind->fa).lock()!=goal;rotate(ind)){
-            if(auto&& fa=get<0>(ind->fa).lock();!is_root(fa)) 
-                rotate(((get<0>(fa->fa).lock()->ls==fa)^(fa->ls==ind))?ind:fa);
+        for(;!is_root(ind)&&get<0>(ind->fa).lock()!=goal;rotate(ind,_rt_)){
+            if(auto&& fa=get<0>(ind->fa).lock();!is_root(fa)&&get<0>(fa->fa).lock()!=goal) 
+                rotate(((get<0>(fa->fa).lock()->ls==fa)^(fa->ls==ind))?ind:fa,_rt_);
         }
         if(goal==nullptr) _rt_=ind,set_tree(_rt_);
     }
@@ -164,12 +165,12 @@ public:
     constexpr inline void build(const vector<input_type>& in){
         if(rt!=nullptr) clear();
         if(!in.size()) return;
-        function<void(shared_ptr<node>&,const uint&,const uint&)> real_build=[&](shared_ptr<node>& ind,const uint& l,const uint& r)->void {
+        function<void(shared_ptr<node>&,const uint&,const uint&)> real_build=[&](shared_ptr<node>& ind,const int& l,const int& r)->void {
             if(l>r) return;
-            uint mid=(l+r)>>1;
+            int mid=(l+r)>>1;
             ind=apply_newnode(assign(answer_type_e,in[mid]));
             real_build(ind->ls,l,mid-1),real_build(ind->rs,mid+1,r);
-            real_pushup(ind);
+            real_pushup(ind); 
             return;
         };
         real_build(rt,0,in.size()-1);
@@ -209,6 +210,7 @@ protected:
         shared_ptr<node> lst,ind=_rt_;
         uint res=0;
         while(ind!=nullptr){
+            real_pushdown(ind);
             if(pred(ind->val,val)){
                 lst=ind;
                 res+=get_size(ind->ls)+ind->cnt;
@@ -225,6 +227,7 @@ protected:
         if(k<1||k>get_size(_rt_)) return nullptr;
         auto ind=_rt_;
         while(ind!=nullptr){
+            real_pushdown(ind);
             uint lsiz=get_size(ind->ls);
             if(lsiz<k&&k<=lsiz+ind->cnt) return real_splay(ind,_rt_),ind;
             else if(k<=lsiz) ind=ind->ls;
@@ -252,7 +255,7 @@ protected:
             pre_rk->rs=newone;
             real_pushup(newone),real_pushup(pre_rk);
         }//拆点,把pre_rk这个点拆成两个 大小分别为 l-_tmp_rk,pre_rk->cnt+_tmp_rk-l
-        auto nex_rk=get_ptr_by_rk(r+1,_rt_),nex_ind=nex(get_ptr_by_rk(r,_rt_),_rt_);
+        auto nex_rk=get_ptr_by_rk(r+1,_rt_),nex_ind=next(get_ptr_by_rk(r,_rt_),_rt_);
         if(nex_rk!=nex_ind){
             uint _tmp_rk=get_rk(nex_rk);
             auto newone=apply_newnode(nex_rk->val,r-_tmp_rk+1);
@@ -262,7 +265,8 @@ protected:
             real_pushup(newone),real_pushup(nex_rk);
         }//同理 分别为 r-_tmp_rk+1,nex_rk->cnt+_tmp_rk-r-1
         //注意下方splay的东西
-        real_splay(pre_rk,_rt_),real_splay(nex_rk,pre_rk,_rt_);
+        real_splay(pre_rk,_rt_);
+        real_splay(nex_rk,pre_rk,_rt_);
         auto ind=_rt_;
         if(pre_rk!=nullptr) ind=ind->rs;
         if(nex_rk!=nullptr) ind=ind->ls;
@@ -294,6 +298,7 @@ protected:
     inline void insert(const shared_ptr<node>& _ptr_,shared_ptr<node>& _rt_){//ind->val可能不存在
         shared_ptr<node> lst,ind=_rt_;
         while(ind!=nullptr){
+            real_pushdown(ind);
             lst=ind;
             if(strong_comp(ind->val,_ptr_->val)) ind=ind->rs;
             else ind=ind->ls;
@@ -329,12 +334,12 @@ protected:
 
     inline void reverse(const shared_ptr<node>& _rt_){if(_rt_!=nullptr) _rt_->reverse_tag^=true;}
     inline void reverse(const uint& l,const uint& r,shared_ptr<node>& _rt_){
-        auto &ind=select(l,r,_rt_);
+        auto&& ind=select(l,r,_rt_);
         ind->reverse_tag^=true;
     }
     inline void modify(const input_type& val,const shared_ptr<node>& _rt_){if(_rt_!=nullptr) _rt_->val=assign(_rt_->val,val),_rt_->tag=pushdown(_rt_->tag,val);}
     inline void modify(const uint& l,const uint& r,const input_type& val,shared_ptr<node>& _rt_){
-        auto &ind=select(l,r,_rt_);
+        auto&& ind=select(l,r,_rt_);
         ind->val=assign(_rt_->val,val),ind->tag=pushdown(ind->tag,val);
     }
 
@@ -381,31 +386,54 @@ protected:
     #undef tp
 };
 
+// int main(){
+//     ios::sync_with_stdio(false),cin.tie(nullptr),cout.tie(nullptr);
+//     int n;
+//     cin>>n;
+//     auto assign=[]([[maybe_unused]]int x,int y){return y;};
+//     default_empty<int> tmp1;
+//     less<int> tmp2;
+//     splay<int,int,default_empty<int>,default_empty<int>,decltype(assign)> fhq_tr(tmp1,tmp1,assign,tmp2);
+//     while(n--){
+//         int opt,x;
+//         cin>>opt>>x;
+//         if(opt==1) fhq_tr.insert(x);
+//         else if(opt==2) fhq_tr.erase(fhq_tr.get_rk(x));
+//         else if(opt==3){
+//             cout<<fhq_tr.get_rk(x)<<'\n';
+//         }else if(opt==4){
+//             cout<<fhq_tr.get_ptr_by_rk(x)->val<<'\n';
+//         }else if(opt==5){
+//             cout<<fhq_tr.prev(x)->val<<'\n';
+//         }else{
+//             cout<<fhq_tr.next(x)->val<<'\n';
+//         }
+//     }
+//     return 0;
+// }
+
 int main(){
-    ios::sync_with_stdio(false),cin.tie(nullptr),cout.tie(nullptr);
-    int n;
-    cin>>n;
+    //freopen("3391_4.in","r",stdin),freopen("1.ans","w",stdout);
+    int n,m;
+    cin>>n>>m;
+    vector<int> a(n,0);
+    iota(all(a),1);
     auto assign=[]([[maybe_unused]]int x,int y){return y;};
     default_empty<int> tmp1;
     less<int> tmp2;
-    splay<int,int,default_empty<int>,default_empty<int>,decltype(assign)> fhq_tr(tmp1,tmp1,assign,tmp2);
-    while(n--){
-        int opt,x;
-        cin>>opt>>x;
-        if(opt==1) fhq_tr.insert(x);
-        else if(opt==2) fhq_tr.erase(fhq_tr.get_rk(x));
-        else if(opt==3){
-            cout<<fhq_tr.get_rk(x)<<'\n';
-        }else if(opt==4){
-            cout<<fhq_tr.get_ptr_by_rk(x)->val<<'\n';
-        }else if(opt==5){
-            cout<<fhq_tr.prev(x)->val<<'\n';
-        }else{
-            cout<<fhq_tr.next(x)->val<<'\n';
-        }
+    splay<int,int,default_empty<int>,default_empty<int>,decltype(assign)> tree(a,tmp1,tmp1,assign,tmp2);
+    for(int i=1;i<=m;++i){
+        int l,r;
+        cin>>l>>r;
+        tree.reverse(l,r);
     }
+    vector<int> res;
+    tree.to_vector(res);
+    for(int& x:res) cout<<x<<' ';
+    cout<<'\n';
     return 0;
 }
+
 /*
 Storms don't scare me
 No not anymore

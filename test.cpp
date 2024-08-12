@@ -23,7 +23,7 @@ inline void write(T t1){
     pc(t1%10+'0');
 }
 
-const int msiz=1e5+15;
+const int msiz=20;
 int n;
 
 int tot,rt;
@@ -61,10 +61,20 @@ inline void rotate(int ind){
 	tr[x].fa=ind,pushup(x),pushup(ind);
 }
 
+//inline void splay(int ind,int g){
+//	if(!ind) return;
+//	while(faa!=g){
+//		int x=faa,y=tr[x].fa;
+//		if(y!=g) ((tr[y].lc==x)^(tr[x].lc==ind))?rotate(ind):rotate(x);
+//		rotate(ind);
+//	}
+//	if(!g) rt=ind;
+//}
+
 inline void splay(int ind,int g){
 	if(!ind) return;
 	for(rg int f=faa;f=faa,f!=g;rotate(ind))
-		if(tr[f].fa) rotate((chk(f)^chk(ind))?ind:f);
+		if(tr[f].fa!=g) rotate((chk(f)^chk(ind))?ind:f);
 	if(!g) rt=ind;
 }
 
