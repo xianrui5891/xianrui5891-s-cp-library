@@ -23,7 +23,7 @@ inline void write(T t1){
     pc(t1%10+'0');
 }
 
-const int msiz=20;
+const int msiz=1e5+15;
 int n;
 
 int tot,rt;
@@ -53,23 +53,12 @@ inline int newnode(int x){
 }
 
 inline void rotate(int ind){
-	assert(faa!=0);
 	int x=faa,y=tr[x].fa,k=chk(ind);
 	chk(x)?(tr[y].rc=ind):(tr[y].lc=ind),faa=y;
 	if(k) tr[x].rc=ls,tr[ls].fa=x,ls=x;
 	else tr[x].lc=rs,tr[rs].fa=x,rs=x;
 	tr[x].fa=ind,pushup(x),pushup(ind);
 }
-
-//inline void splay(int ind,int g){
-//	if(!ind) return;
-//	while(faa!=g){
-//		int x=faa,y=tr[x].fa;
-//		if(y!=g) ((tr[y].lc==x)^(tr[x].lc==ind))?rotate(ind):rotate(x);
-//		rotate(ind);
-//	}
-//	if(!g) rt=ind;
-//}
 
 inline void splay(int ind,int g){
 	if(!ind) return;

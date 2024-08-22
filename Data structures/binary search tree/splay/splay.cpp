@@ -211,8 +211,8 @@ protected:
         uint res=0;
         while(ind!=nullptr){
             real_pushdown(ind);
+            lst=ind;
             if(pred(ind->val,val)){
-                lst=ind;
                 res+=get_size(ind->ls)+ind->cnt;
                 ind=ind->rs;
             }
@@ -225,14 +225,16 @@ protected:
 
     inline shared_ptr<node> get_ptr_by_rk(uint k,shared_ptr<node>& _rt_){
         if(k<1||k>get_size(_rt_)) return nullptr;
-        auto ind=_rt_;
+        shared_ptr<node> lst,ind=_rt_;
         while(ind!=nullptr){
             real_pushdown(ind);
-            uint lsiz=get_size(ind->ls);
+            lst=ind;
+            uint&& lsiz=get_size(ind->ls);
             if(lsiz<k&&k<=lsiz+ind->cnt) return real_splay(ind,_rt_),ind;
             else if(k<=lsiz) ind=ind->ls;
             else k-=lsiz+ind->cnt,ind=ind->rs;
         }
+        real_splay(lst,_rt_);
         return nullptr;
     }//排名从1开始
 
@@ -245,6 +247,25 @@ protected:
     inline shared_ptr<node> next(const answer_type& val,shared_ptr<node>& _rt_){return get_ptr_by_rk(get_rk_by_pred(val,weak_comp,_rt_),_rt_);}
 
     inline shared_ptr<node> select(const uint& l,const uint& r,shared_ptr<node>& _rt_){
+        if(l>r) return nullptr;
+        auto pre_rk=get_ptr_by_rk(l-1,_rt_);
+        auto nex_rk=get_ptr_by_rk(r+1,_rt_);
+        real_splay(pre_rk,_rt_);
+        real_splay(nex_rk,pre_rk,_rt_);
+        auto ind=_rt_;
+        if(pre_rk!=nullptr) ind=ind->rs;
+        if(nex_rk!=nullptr) ind=ind->ls;
+        return ind;
+    }
+    inline shared_ptr<node> select(const answer_type& val,shared_ptr<node>& _rt_){
+        auto pre=prev(val,_rt_),nex=next(val,_rt_);
+        real_splay(pre,_rt_),real_splay(nex,pre,_rt_);
+        auto ind=_rt_;
+        if(pre!=nullptr) ind=ind->rs;
+        if(nex!=nullptr) ind=ind->ls;
+        return ind;
+    }
+    inline shared_ptr<node> select_with_split(const uint& l,const uint& r,shared_ptr<node>& _rt_){
         if(l>r) return nullptr;
         auto pre_rk=get_ptr_by_rk(l-1,_rt_),pre_ind=prev(get_ptr_by_rk(l,_rt_),_rt_);
         if(pre_rk!=pre_ind){
@@ -270,14 +291,6 @@ protected:
         auto ind=_rt_;
         if(pre_rk!=nullptr) ind=ind->rs;
         if(nex_rk!=nullptr) ind=ind->ls;
-        return ind;
-    }
-    inline shared_ptr<node> select(const answer_type& val,shared_ptr<node>& _rt_){
-        auto pre=prev(val,_rt_),nex=next(val,_rt_);
-        real_splay(pre,_rt_),real_splay(nex,pre,_rt_);
-        auto ind=_rt_;
-        if(pre!=nullptr) ind=ind->rs;
-        if(nex!=nullptr) ind=ind->ls;
         return ind;
     }
 
@@ -386,53 +399,55 @@ protected:
     #undef tp
 };
 
-// int main(){
-//     ios::sync_with_stdio(false),cin.tie(nullptr),cout.tie(nullptr);
-//     int n;
-//     cin>>n;
-//     auto assign=[]([[maybe_unused]]int x,int y){return y;};
-//     default_empty<int> tmp1;
-//     less<int> tmp2;
-//     splay<int,int,default_empty<int>,default_empty<int>,decltype(assign)> fhq_tr(tmp1,tmp1,assign,tmp2);
-//     while(n--){
-//         int opt,x;
-//         cin>>opt>>x;
-//         if(opt==1) fhq_tr.insert(x);
-//         else if(opt==2) fhq_tr.erase(fhq_tr.get_rk(x));
-//         else if(opt==3){
-//             cout<<fhq_tr.get_rk(x)<<'\n';
-//         }else if(opt==4){
-//             cout<<fhq_tr.get_ptr_by_rk(x)->val<<'\n';
-//         }else if(opt==5){
-//             cout<<fhq_tr.prev(x)->val<<'\n';
-//         }else{
-//             cout<<fhq_tr.next(x)->val<<'\n';
-//         }
-//     }
-//     return 0;
-// }
-
 int main(){
-    //freopen("3391_4.in","r",stdin),freopen("1.ans","w",stdout);
-    int n,m;
-    cin>>n>>m;
-    vector<int> a(n,0);
-    iota(all(a),1);
+    //freopen("3369_14.in","r",stdin),freopen("1.ans","w",stdout);
+    ios::sync_with_stdio(false),cin.tie(nullptr),cout.tie(nullptr);
+    int n;
+    cin>>n;
     auto assign=[]([[maybe_unused]]int x,int y){return y;};
     default_empty<int> tmp1;
     less<int> tmp2;
-    splay<int,int,default_empty<int>,default_empty<int>,decltype(assign)> tree(a,tmp1,tmp1,assign,tmp2);
-    for(int i=1;i<=m;++i){
-        int l,r;
-        cin>>l>>r;
-        tree.reverse(l,r);
+    splay<int,int,default_empty<int>,default_empty<int>,decltype(assign)> fhq_tr(tmp1,tmp1,assign,tmp2);
+    while(n--){
+        int opt,x;
+        cin>>opt>>x;
+        if(opt==1) fhq_tr.insert(x);
+        else if(opt==2) fhq_tr.erase(fhq_tr.get_rk(x));
+        else if(opt==3){
+            cout<<fhq_tr.get_rk(x)<<'\n';
+        }else if(opt==4){
+            cout<<fhq_tr.get_ptr_by_rk(x)->val<<'\n';
+        }else if(opt==5){
+            cout<<fhq_tr.prev(x)->val<<'\n';
+        }else{
+            cout<<fhq_tr.next(x)->val<<'\n';
+        }
     }
-    vector<int> res;
-    tree.to_vector(res);
-    for(int& x:res) cout<<x<<' ';
-    cout<<'\n';
     return 0;
 }
+
+// int main(){
+//     //freopen("3391_4.in","r",stdin),freopen("1.ans","w",stdout);
+//     ios::sync_with_stdio(false),cin.tie(nullptr),cout.tie(nullptr);
+//     int n,m;
+//     cin>>n>>m;
+//     vector<int> a(n,0);
+//     iota(all(a),1);
+//     auto assign=[]([[maybe_unused]]int x,int y){return y;};
+//     default_empty<int> tmp1;
+//     less<int> tmp2;
+//     splay<int,int,default_empty<int>,default_empty<int>,decltype(assign)> tree(a,tmp1,tmp1,assign,tmp2);
+//     for(int i=1;i<=m;++i){
+//         int l,r;
+//         cin>>l>>r;
+//         tree.reverse(l,r);
+//     }
+//     vector<int> res;
+//     tree.to_vector(res);
+//     for(int& x:res) cout<<x<<' ';
+//     cout<<'\n';
+//     return 0;
+// }
 
 /*
 Storms don't scare me
